@@ -12,7 +12,7 @@ import os
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten
-
+import tensorflow as tf
 class MyModel(
     MltkModel,
     TrainMixin,
@@ -49,7 +49,15 @@ my_model.class_mode = 'categorical'
 my_model.classes = ('aoquan', 'ca', 'caphe', 'chebiensan', 'daydep', 'gao', 'giaikhat', 'giavi', 'giay', 'haisan', 'hop', 'lanh', 'nuocuong', 'raucu', 'sachvo', 'sua', 'thit', 'tra', 'traicay', 'unknow', 'vat')
 # The input shape to the model
 my_model.input_shape = (50, 10, 1)
-
+# These are the settings used to quantize the model
+# We want all the internal ops as well as
+# model input/output to be int8
+my_model.tflite_converter['optimizations'] = [tf.lite.Optimize.DEFAULT]
+my_model.tflite_converter['supported_ops'] = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+my_model.tflite_converter['inference_input_type'] = np.int8
+my_model.tflite_converter['inference_output_type'] = np.int8
+# Automatically generate a representative dataset from the validation data
+my_model.tflite_converter['representative_dataset'] = 'generate'
 validation_split = 0.1
 
 ##############################################################
