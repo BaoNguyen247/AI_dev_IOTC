@@ -669,7 +669,7 @@ my_model.model_parameters.update(frontend_settings)
 my_model.input_shape = frontend_settings.spectrogram_shape + (1,)
 
 # Add the direction keywords plus a _unknown_ meta class
-my_model.classes = ['on', 'off', '_unknown_']
+my_model.classes = ['ca', 'aoquan', '_unknown_']
 unknown_class_id = my_model.classes.index('_unknown_')
 
 # Ensure the class weights are balanced during training
@@ -831,24 +831,24 @@ def audio_augmentation_pipeline(
                 transforms=[
                 #audiomentations.PitchShift(min_semitones=-1, max_semitones=1, p=0.5),
                 audiomentations.TimeStretch(min_rate=0.90, max_rate=1.1, p=1.0),
-                audiomentations.Gain(min_gain_in_db=0.95, max_gain_in_db=1.5, p=1.0),
+                audiomentations.Gain(min_gain_db=0.95, max_gain_db=1.5, p=1.0),
                 audiomentations.AddBackgroundNoise(
                     f'{dataset_dir}/_background_noise_/brd2601',
-                    min_absolute_rms_in_db=-75.0,
-                    max_absolute_rms_in_db=-60.0,
+                    min_absolute_rms_db=-75.0,
+                    max_absolute_rms_db=-60.0,
                     noise_rms="absolute",
                     lru_cache_size=50,
                     p=1.0
                 ),
                 audiomentations.AddBackgroundNoise(
                     f'{dataset_dir}/_background_noise_/ambient',
-                    min_snr_in_db=3,
-                    max_snr_in_db=25,
+                    min_snr_db=3,
+                    max_snr_db=25,
                     noise_rms="relative",
                     lru_cache_size=50,
                     p=0.75
                 ),
-                audiomentations.AddGaussianSNR(min_snr_in_db=30, max_snr_in_db=60, p=0.25),
+                audiomentations.AddGaussianSNR(min_snr_db=30, max_snr_db=60, p=0.25),
             ])
             globals()['audio_augmentations'] = audio_augmentations
 
@@ -985,11 +985,28 @@ class MyDataset(mltk_core.MltkDataset):
         dataset_background_dir = f'{dataset_dir}/_background_noise_'
 
         # Download the synthetic on/off dataset and extract into the speech commands dataset
+        download_verify_extract(
+            url='https://www.silabs.com/public/files/github/mltk/datasets/sl_synthetic_on_off.7z',
+            dest_dir=dataset_dir,
+            file_hash='b20697b82f883e4dc5e0afc4b7dc950d3339e703',
+            show_progress=False,
+            remove_root_dir=False,
+            clean_dest_dir=False
+        )
 
         # Download the synthetic on/off "unknown" dataset and extract into the speech commands dataset: '_on_off_unknown' sub-directory
+        # additional_unknown_dataset_dir = download_verify_extract(
+        #     url='https://github.com/SiliconLabs/mltk_assets/blob/master/datasets/speech_dataset_spec.7z',
+        #     dest_dir=f'{dataset_dir}/_on_off_unknown',
+        #     file_hash='f3ce9bad55200c6c6fdf5df4271b372667d9390585638bb8454ad579507091d4',
+        #     show_progress=False,
+        #     remove_root_dir=False,
+        #     clean_dest_dir=True
+        # )
+
         # Download the BRD2601 background microphone audio and add it to the _background_noise_/brd2601 of the dataset
         download_verify_extract(
-            url='https://github.com/SiliconLabs/mltk_assets/raw/master/datasets/brd2601_background_audio.7z',
+            url='https://github.com/SiliconLabs/mltk_assets/blob/master/datasets/brd2601_background_audio.7z',
             dest_dir=f'{dataset_background_dir}/brd2601',
             file_hash='3069A85002965A7830C660343C215EDD4FAE39C6',
             show_progress=False,
@@ -999,6 +1016,33 @@ class MyDataset(mltk_core.MltkDataset):
 
         # Download other ambient background audio and add it to the _background_noise_/ambient of the dataset
         # See https://mixkit.co/
+        URLS = [
+            'https://assets.mixkit.co/active_storage/sfx/360/360.wav',
+            'https://assets.mixkit.co/active_storage/sfx/364/364.wav',
+            'https://assets.mixkit.co/active_storage/sfx/444/444.wav',
+            'https://assets.mixkit.co/active_storage/sfx/1386/1386.wav',
+            'https://assets.mixkit.co/active_storage/sfx/447/447.wav',
+            'https://assets.mixkit.co/active_storage/sfx/453/453.wav'
+        ]
+
+        for url in URLS:
+            fn = os.path.basename(url)
+            dst_path = f'{dataset_background_dir}/ambient/{fn}'
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            if not os.path.exists(dst_path):
+                download_url(url=url, dst_path=dst_path)
+                sample, original_sample_rate = audio_utils.read_audio_file(
+                    dst_path,
+                    return_sample_rate=True,
+                    return_numpy=True
+                )
+                sample = audio_utils.resample(
+                    sample,
+                    orig_sr=original_sample_rate,
+                    target_sr=frontend_settings.sample_rate_hz
+                )
+                audio_utils.write_audio_file(dst_path, sample, sample_rate=16000)
+
         def _add_additional_unknown_samples(
             directory:str,
             sample_paths:Dict[str,str],
@@ -1010,16 +1054,16 @@ class MyDataset(mltk_core.MltkDataset):
             """This is called by the tf_dataset_utils.load_audio_directory() API
             Here we add the additional samples in the synthetic_on_off_unknown_v1 dataset to the "unknown" samples
             """
-            unknown_samples = sample_paths['_unknown_']
-            paths = sorted(os.listdir(additional_unknown_dataset_dir + '/unknown'))
-            if shuffle:
-                rng = np.random.RandomState(seed)
-                rng.shuffle(paths)
-
-            paths = split_file_list(paths, split=split)
-
-            for fn in paths:
-                unknown_samples.append(f'_on_off_unknown/unknown/{fn}')
+            #unknown_samples = sample_paths['_unknown_']
+            #paths = sorted(os.listdir(additional_unknown_dataset_dir + '/unknown'))
+            # if shuffle:
+            #     rng = np.random.RandomState(seed)
+            #     rng.shuffle(paths)
+            #
+            # paths = split_file_list(paths, split=split)
+            #
+            # for fn in paths:
+            #     unknown_samples.append(f'_on_off_unknown/unknown/{fn}')
 
 
         # Create a tf.data.Dataset from the extracted "Speech Commands" directory
