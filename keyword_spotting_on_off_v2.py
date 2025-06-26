@@ -669,7 +669,7 @@ my_model.model_parameters.update(frontend_settings)
 my_model.input_shape = frontend_settings.spectrogram_shape + (1,)
 
 # Add the direction keywords plus a _unknown_ meta class
-my_model.classes = ['ca', 'aoquan', '_unknown_']
+my_model.classes = ['aoquan', 'ca', '_unknown_']
 unknown_class_id = my_model.classes.index('_unknown_')
 
 # Ensure the class weights are balanced during training
@@ -826,6 +826,7 @@ def audio_augmentation_pipeline(
         audio_augmentations = globals().get('audio_augmentations', None)
         if audio_augmentations is None:
             dataset_dir = speech_commands_v2.load_clean_data()
+            print(dataset_dir)
             audio_augmentations = audiomentations.Compose(
                 p=1.0,
                 transforms=[
@@ -983,7 +984,8 @@ class MyDataset(mltk_core.MltkDataset):
         # Download, extract, and clean the "Speech Commands" dataset
         dataset_dir = speech_commands_v2.load_clean_data()
         dataset_background_dir = f'{dataset_dir}/_background_noise_'
-
+        print('path dir1:' +dataset_dir)
+        print('path dir2:' + dataset_background_dir)
         # Download the synthetic on/off dataset and extract into the speech commands dataset
         download_verify_extract(
             url='https://www.silabs.com/public/files/github/mltk/datasets/sl_synthetic_on_off.7z',
@@ -1269,9 +1271,9 @@ if __name__ == '__main__':
 
     # Train the "teacher" model
     # This does the same as issuing the command: export TRAIN_TEACHER=1 && mltk train keyword_spotting_on_off_v2-test --clean
-    prepare_teacher_or_student_model(train_teacher=True)
-    train_results = mltk_core.train_model(my_model, clean=True, test=test_mode_enabled)
-    print(train_results)
+    # prepare_teacher_or_student_model(train_teacher=False)
+    # train_results = mltk_core.train_model(my_model, clean=True, test=test_mode_enabled)
+    # print(train_results)
 
     # Train the "student" model
     # This does the same as issuing the command: export TRAIN_TEACHER=0 && mltk train keyword_spotting_on_off_v2-test --clean
